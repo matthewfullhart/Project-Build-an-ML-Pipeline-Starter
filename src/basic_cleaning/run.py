@@ -29,7 +29,11 @@ def go(args):
     df = df[idx].copy()
     # Convert last_review to datetime
     df['last_review'] = pd.to_datetime(df['last_review'])
-df['name'] = df['name'].replace({r'\n': ' '}, regex=True)
+
+    #added chunk here to get rid of an issue with a newline character causing things not to parse right
+    df['name'] = df['name'].replace({r'\n': ' '}, regex=True)
+
+    
     idx = df['longitude'].between(-74.25, -73.50) & df['latitude'].between(40.5, 41.2)
     df = df[idx].copy()
     # Save the cleaned file
