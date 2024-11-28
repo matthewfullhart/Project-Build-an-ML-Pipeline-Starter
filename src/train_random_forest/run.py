@@ -17,7 +17,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.impute import SimpleImputer
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import OrdinalEncoder, FunctionTransformer
+from sklearn.preprocessing import OrdinalEncoder, FunctionTransformer, OneHotEncoder
 
 import wandb
 from sklearn.ensemble import RandomForestRegressor
@@ -67,15 +67,25 @@ def go(args):
     logger.info("Preparing sklearn pipeline")
 
     sk_pipe, processed_features = get_inference_pipeline(rf_config, args.max_tfidf_features)
-
+    print("processed features: ")
+    print(processed_features)
     # Then fit it to the X_train, y_train data
     logger.info("Fitting")
-
+    print("Before preprocessing:")
+    print(X_val["last_review"].head())
+    print(X_val["last_review"].isnull().sum())
+    simple_imputer = SimpleImputer(strategy='constant', fill_value='2010-01-01')
+    imputed_last_review = simple_imputer.fit_transform(X_val[["last_review"]])
+    delta_feature = delta_date_feature(imputed_last_review)
+    print("After delta_date_feature:", pd.DataFrame(delta_feature).isnull().sum())
+    print(X_val["last_review"].head(20))
+    
     ######################################
     # Fit the pipeline sk_pipe by calling the .fit method on X_train and y_train
     # YOUR CODE HERE
+    sk_pipe.fit(X_train, y_train)
     ######################################
-
+    
     # Compute r2 and MAE
     logger.info("Scoring")
     r_squared = sk_pipe.score(X_val, y_val)
@@ -91,14 +101,23 @@ def go(args):
     # Save model package in the MLFlow sklearn format
     if os.path.exists("random_forest_dir"):
         shutil.rmtree("random_forest_dir")
-
+    print("X_train columns:", X_train.columns)
+    print("X_val columns:", X_val.columns)
+    print(X_train.dtypes)
+    print(X_val.dtypes)
+    print(X_train.isnull().sum())
+    print(X_val.isnull().sum())
     ######################################
     # Save the sk_pipe pipeline as a mlflow.sklearn model in the directory "random_forest_dir"
+    export_path = "random_forest_dir"
     # HINT: use mlflow.sklearn.save_model
     signature = mlflow.models.infer_signature(X_val, y_pred)
     mlflow.sklearn.save_model(
         # YOUR CODE HERE
-        signature = signature,
+        sk_pipe,
+        export_path,
+        signature=signature,
+        # serialization_format=mlflow.sklearn.SERIALIZATION_FORMAT_CLOUDPICKLE,
         input_example = X_train.iloc[:5]
     )
     ######################################
@@ -122,6 +141,7 @@ def go(args):
     run.summary['r2'] = r_squared
     # Now save the variable mae under the key "mae".
     # YOUR CODE HERE
+    run.summary['mae'] = mae
     ######################################
 
     # Upload to W&B the feture importance visualization
@@ -165,6 +185,8 @@ def get_inference_pipeline(rf_config, max_tfidf_features):
     # 2 - A OneHotEncoder() step to encode the variable
     non_ordinal_categorical_preproc = make_pipeline(
         # YOUR CODE HERE
+        SimpleImputer(strategy="most_frequent"),
+        OneHotEncoder()
     )
     ######################################
 
@@ -215,7 +237,6 @@ def get_inference_pipeline(rf_config, max_tfidf_features):
     )
 
     processed_features = ordinal_categorical + non_ordinal_categorical + zero_imputed + ["last_review", "name"]
-
     # Create random forest
     random_forest = RandomForestRegressor(**rf_config)
 
@@ -228,6 +249,8 @@ def get_inference_pipeline(rf_config, max_tfidf_features):
     sk_pipe = Pipeline(
         steps =[
         # YOUR CODE HERE
+            ("preprocessor", preprocessor),
+            ("random_forest", random_forest)
         ]
     )
 
