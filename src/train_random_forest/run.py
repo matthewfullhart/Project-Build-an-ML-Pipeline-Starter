@@ -67,19 +67,9 @@ def go(args):
     logger.info("Preparing sklearn pipeline")
 
     sk_pipe, processed_features = get_inference_pipeline(rf_config, args.max_tfidf_features)
-    print("processed features: ")
-    print(processed_features)
     # Then fit it to the X_train, y_train data
     logger.info("Fitting")
-    print("Before preprocessing:")
-    print(X_val["last_review"].head())
-    print(X_val["last_review"].isnull().sum())
-    simple_imputer = SimpleImputer(strategy='constant', fill_value='2010-01-01')
-    imputed_last_review = simple_imputer.fit_transform(X_val[["last_review"]])
-    delta_feature = delta_date_feature(imputed_last_review)
-    print("After delta_date_feature:", pd.DataFrame(delta_feature).isnull().sum())
-    print(X_val["last_review"].head(20))
-    
+   
     ######################################
     # Fit the pipeline sk_pipe by calling the .fit method on X_train and y_train
     # YOUR CODE HERE
@@ -101,25 +91,18 @@ def go(args):
     # Save model package in the MLFlow sklearn format
     if os.path.exists("random_forest_dir"):
         shutil.rmtree("random_forest_dir")
-    print("X_train columns:", X_train.columns)
-    print("X_val columns:", X_val.columns)
-    print(X_train.dtypes)
-    print(X_val.dtypes)
-    print(X_train.isnull().sum())
-    print(X_val.isnull().sum())
     ######################################
     # Save the sk_pipe pipeline as a mlflow.sklearn model in the directory "random_forest_dir"
-    export_path = "random_forest_dir"
     # HINT: use mlflow.sklearn.save_model
-    signature = mlflow.models.infer_signature(X_val, y_pred)
     mlflow.sklearn.save_model(
         # YOUR CODE HERE
         sk_pipe,
-        export_path,
-        signature=signature,
-        # serialization_format=mlflow.sklearn.SERIALIZATION_FORMAT_CLOUDPICKLE,
-        input_example = X_train.iloc[:5]
+        "random_forest_dir"
     )
+    #signature = mlflow.models.infer_signature(X_val, y_pred)
+    #no matter what I try, the step above seems to fail. It seems to have something to do with Null values in X_val, but that should be handled by the imputer? I'm very confused.
+    input_example = X_train.iloc[:5]
+
     ######################################
 
 
